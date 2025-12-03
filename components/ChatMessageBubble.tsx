@@ -101,14 +101,14 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
           <div className="mt-2 w-full bg-gray-800 border border-gray-700 rounded-2xl p-4 shadow-lg relative overflow-hidden">
             {/* Grade */}
             {rating && (
-              <div className="absolute top-3 right-3 bg-gray-900/80 px-3 py-1.5 rounded-xl border border-gray-700 text-xs font-bold flex items-center gap-2">
+              <div className="absolute top-3 right-3 bg-gray-900/80 px-3 py-1.5 rounded-xl border border-gray-700 text-xs font-bold flex items-center gap-2 pointer-events-none shadow-lg">
                 <span className="text-gray-400 uppercase tracking-wide">Оценка</span>
                 <span className={`text-lg ${rating.color}`}>{rating.grade}</span>
                 <span className="text-gray-500 font-mono">({rating.score})</span>
               </div>
             )}
 
-            <div className="flex items-start justify-between gap-2 mb-3">
+            <div className="flex items-start justify-between gap-2 mb-3 pr-28 pt-2">
               <div className="flex items-center gap-2">
                 <ChefHat size={16} className="text-green-400" />
                 <h3 className="font-bold text-green-400 text-base leading-tight">{message.data.name}</h3>
@@ -189,10 +189,10 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
               <button
                 onClick={() => onAddLog(message.data!, message.text)}
                 disabled={isAdded}
-                className={`w-full mt-4 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 ${
+                className={`w-full mt-4 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all shadow-md ${
                   isAdded
-                    ? 'bg-green-600/20 text-green-400 cursor-default border border-green-500/20'
-                    : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/20'
+                    ? 'bg-green-600/20 text-green-400 cursor-default border border-green-500/20 pointer-events-none'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/20 active:scale-95'
                 }`}
               >
                 {isAdded ? (
