@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { DailyLogItem } from '../types';
-import { Calendar, Trash2, Clock, Flame, Dumbbell, Droplet, Wheat, Search, X, Filter, Download, MessageSquare, Check, Edit2, ChevronDown, ChevronUp, Info, Fish, Anchor } from 'lucide-react';
+import { Calendar, Trash2, Clock, Flame, Dumbbell, Droplet, Wheat, Search, X, Filter, Download, MessageSquare, Check, Edit2, ChevronDown, ChevronUp, Info, Fish, Anchor, Leaf, Scale, ShieldAlert } from 'lucide-react';
 
 interface Props {
   logs: DailyLogItem[];
@@ -147,6 +147,33 @@ const FoodArchive: React.FC<Props> = ({ logs, onDelete, onUpdate }) => {
   const toggleExpand = (id: string) => {
     setExpandedId(prev => prev === id ? null : id);
   }
+
+  const cleanAiAnalysis = (text?: string) => {
+    if (!text) return '';
+    return text.replace(/```json[\s\S]*?```/gi, '').trim();
+  };
+
+  const formatOmega = (item: DailyLogItem) => {
+    const o3 = item.omega3 ?? 0;
+    const o6 = item.omega6 ?? 0;
+    if (o3 <= 0 && o6 <= 0) return '—';
+    if (o3 > 0) {
+      const ratio = o6 > 0 ? (o6 / o3) : 0;
+      return `1:${ratio.toFixed(1)}`;
+    }
+    return '—';
+  };
+
+  const formatIron = (item: DailyLogItem) => {
+    if (item.ironType) return item.ironType;
+    const total = item.ironTotal ?? 0;
+    const heme = item.hemeIron ?? 0;
+    if (total <= 0) return '—';
+    const share = heme / total;
+    if (share > 0.7) return 'гемовое';
+    if (share < 0.2) return 'негемовое';
+    return 'смешанное';
+  };
 
   return (
     <div className="h-full overflow-y-auto pb-24 p-4 space-y-4 bg-gray-900">
@@ -366,14 +393,69 @@ const FoodArchive: React.FC<Props> = ({ logs, onDelete, onUpdate }) => {
                             </div>
                           )}
 
-                          {/* AI Analysis Text */}
-                          {item.aiAnalysis && (
+                          {/* Nutrient Card */}
+                          <div className="mb-3 bg-gray-900/40 border border-gray-700 rounded-xl p-3 shadow-sm">
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2">
+                                <Leaf size={14} className="text-green-400" />
+                                <h4 className="font-bold text-green-300 text-sm leading-tight">{item.name}</h4>
+                              </div>
+                              <div className="bg-gray-800 px-2.5 py-1 rounded-lg border border-gray-700 text-xs flex items-center gap-1 text-orange-200">
+                                <Flame size={12} className="text-orange-400" />
+                                <span className="font-semibold text-gray-100">{item.calories} ккал</span>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-4 gap-1.5 text-[11px] mb-2">
+                              <div className="bg-gray-900/60 rounded-lg p-2 flex flex-col items-center gap-1 border border-gray-700/50">
+                                <Dumbbell size={12} className="text-blue-400" />
+                                <span className="font-bold text-blue-200 text-sm">{item.protein}г</span>
+                                <span className="text-gray-500">Белки</span>
+                              </div>
+                              <div className="bg-gray-900/60 rounded-lg p-2 flex flex-col items-center gap-1 border border-gray-700/50">
+                                <Droplet size={12} className="text-yellow-400" />
+                                <span className="font-bold text-yellow-200 text-sm">{item.fat}г</span>
+                                <span className="text-gray-500">Жиры</span>
+                              </div>
+                              <div className="bg-gray-900/60 rounded-lg p-2 flex flex-col items-center gap-1 border border-gray-700/50">
+                                <Wheat size={12} className="text-orange-400" />
+                                <span className="font-bold text-orange-200 text-sm">{item.carbs}г</span>
+                                <span className="text-gray-500">Угл</span>
+                              </div>
+                              <div className="bg-gray-900/60 rounded-lg p-2 flex flex-col items-center gap-1 border border-gray-700/50">
+                                <Leaf size={12} className="text-green-400" />
+                                <span className="font-bold text-green-200 text-sm">{item.fiber}г</span>
+                                <span className="text-gray-500">Клетч</span>
+                              </div>
+                            </div>
+                            <div className="space-y-1 text-[11px] text-gray-300">
+                              <div className="flex items-center justify-between bg-gray-900/50 p-2 rounded-lg border border-gray-700/60">
+                                <div className="flex items-center gap-2 text-gray-400">
+                                  <Scale size={12} className="text-blue-300" />
+                                  <span>Омега 3:6</span>
+                                </div>
+                                <span className="font-mono text-sm text-gray-100">{formatOmega(item)}</span>
+                              </div>
+                              <div className="flex items-center justify-between bg-gray-900/50 p-2 rounded-lg border border-gray-700/60">
+                                <div className="flex items-center gap-2 text-gray-400">
+                                  <ShieldAlert size={12} className="text-rose-300" />
+                                  <span>Тип железа</span>
+                                </div>
+                                <span className="text-gray-100 capitalize">
+                                  {formatIron(item)}
+                                  {item.ironTotal ? ` · ${item.ironTotal.toFixed(1)} мг` : ''}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* AI Analysis Text (cleaned) */}
+                          {item.aiAnalysis && cleanAiAnalysis(item.aiAnalysis) && (
                               <div className="mb-3 bg-blue-900/10 p-2.5 rounded-lg border border-blue-500/10">
                                   <h4 className="text-xs font-bold text-blue-400 mb-1 flex items-center gap-1">
                                       <Info size={12} /> Анализ AI
                                   </h4>
                                   <p className="text-xs text-gray-300 leading-relaxed whitespace-pre-wrap">
-                                      {item.aiAnalysis}
+                                      {cleanAiAnalysis(item.aiAnalysis)}
                                   </p>
                               </div>
                           )}
