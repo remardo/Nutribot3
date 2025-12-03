@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { ChatMessage, NutrientData, PlateRating } from '../types';
-import { ChefHat, Database, Star, Tag } from 'lucide-react';
+import { ChefHat, Database, Star, Flame, Dumbbell, Droplet, Wheat, Leaf, Scale, ShieldAlert } from 'lucide-react';
 import { calculatePlateRating } from '../services/gamificationService';
 
 interface Props {
@@ -93,89 +93,96 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
 
         {/* Structured Data Card (Bot Only) */}
         {!isUser && message.data && (
-          <div className="mt-2 w-full bg-gray-800 border border-gray-700 rounded-xl p-3 shadow-lg relative overflow-hidden">
-            
-            {/* CP6: Grade Badge */}
+          <div className="mt-2 w-full bg-gray-850 bg-gray-800 border border-gray-700 rounded-2xl p-4 shadow-lg relative overflow-hidden">
+            {/* Grade */}
             {rating && (
-                <div className="absolute top-0 right-0 bg-gray-900/80 backdrop-blur-sm border-l border-b border-gray-700 rounded-bl-xl px-3 py-1.5 flex items-center gap-2 z-10">
-                    <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Оценка</div>
-                    <div className={`text-lg font-black ${rating.color} drop-shadow-md`}>{rating.grade}</div>
-                    <div className="text-xs text-gray-500 font-mono">({rating.score})</div>
-                </div>
+              <div className="absolute top-3 right-3 bg-gray-900/80 px-3 py-1.5 rounded-xl border border-gray-700 text-xs font-bold flex items-center gap-2">
+                <span className="text-gray-400 uppercase tracking-wide">Оценка</span>
+                <span className={`text-lg ${rating.color}`}>{rating.grade}</span>
+                <span className="text-gray-500 font-mono">({rating.score})</span>
+              </div>
             )}
 
-            <div className="flex justify-between items-start mb-2 pr-24">
-              <h3 className="font-bold text-green-400 flex items-center gap-2">
-                <ChefHat size={16} />
-                {message.data.name}
-              </h3>
+            <div className="flex items-center gap-2 mb-1">
+              <ChefHat size={16} className="text-green-400" />
+              <h3 className="font-bold text-green-400 text-base leading-tight">{message.data.name}</h3>
             </div>
-            
-            {/* Calories Badge */}
-            <div className="inline-block bg-gray-700/50 px-2 py-0.5 rounded text-gray-300 text-xs mb-3 border border-gray-600/30">
-                 {message.data.calories} ккал
+            <div className="flex items-center gap-2 text-xs text-gray-400 mb-3">
+              <Flame size={14} className="text-orange-400" />
+              <span className="font-semibold text-gray-200">{message.data.calories} ккал</span>
             </div>
 
-            {/* Macros Grid */}
-            <div className="grid grid-cols-4 gap-2 text-center text-xs mb-3">
-              <div className="bg-gray-900/50 p-1 rounded">
-                <div className="text-blue-400 font-bold">{message.data.protein}g</div>
-                <div className="text-gray-500">Белки</div>
+            <div className="grid grid-cols-4 gap-2 text-xs mb-3">
+              <div className="bg-gray-900/60 rounded-xl p-2 flex flex-col items-center gap-1 border border-gray-700/60">
+                <Dumbbell size={14} className="text-blue-400" />
+                <span className="font-bold text-blue-300 text-sm">{message.data.protein}г</span>
+                <span className="text-gray-500">Белки</span>
               </div>
-              <div className="bg-gray-900/50 p-1 rounded">
-                <div className="text-yellow-400 font-bold">{message.data.fat}g</div>
-                <div className="text-gray-500">Жиры</div>
+              <div className="bg-gray-900/60 rounded-xl p-2 flex flex-col items-center gap-1 border border-gray-700/60">
+                <Droplet size={14} className="text-yellow-400" />
+                <span className="font-bold text-yellow-300 text-sm">{message.data.fat}г</span>
+                <span className="text-gray-500">Жиры</span>
               </div>
-              <div className="bg-gray-900/50 p-1 rounded">
-                <div className="text-orange-400 font-bold">{message.data.carbs}g</div>
-                <div className="text-gray-500">Угл</div>
+              <div className="bg-gray-900/60 rounded-xl p-2 flex flex-col items-center gap-1 border border-gray-700/60">
+                <Wheat size={14} className="text-orange-400" />
+                <span className="font-bold text-orange-300 text-sm">{message.data.carbs}г</span>
+                <span className="text-gray-500">Угл</span>
               </div>
-              <div className="bg-gray-900/50 p-1 rounded">
-                <div className="text-green-500 font-bold">{message.data.fiber}g</div>
-                <div className="text-gray-500">Клетч</div>
+              <div className="bg-gray-900/60 rounded-xl p-2 flex flex-col items-center gap-1 border border-gray-700/60">
+                <Leaf size={14} className="text-green-400" />
+                <span className="font-bold text-green-300 text-sm">{message.data.fiber}г</span>
+                <span className="text-gray-500">Клетч</span>
               </div>
             </div>
+
+            <div className="space-y-2 text-xs text-gray-300">
+              <div className="flex items-center justify-between bg-gray-900/50 p-2 rounded-lg border border-gray-700/60">
+                <div className="flex items-center gap-2 text-gray-400">
+                  <Scale size={14} className="text-blue-300" />
+                  <span>Омега 3:6</span>
+                </div>
+                <span className="font-mono text-sm text-gray-100">{formatOmega(message.data)}</span>
+              </div>
+
+              <div className="flex items-center justify-between bg-gray-900/50 p-2 rounded-lg border border-gray-700/60">
+                <div className="flex items-center gap-2 text-gray-400">
+                  <ShieldAlert size={14} className="text-rose-300" />
+                  <span>Тип железа</span>
+                </div>
+                <span className="text-gray-100 capitalize">{formatIron(message.data)}</span>
+              </div>
+            </div>
+
+            {message.data.importantNutrients.length > 0 && (
+              <div className="mt-3">
+                <div className="text-[11px] text-gray-400 mb-1">Важные нутриенты:</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {message.data.importantNutrients.map((n, i) => (
+                    <span key={i} className="bg-indigo-900/40 text-indigo-200 px-2 py-1 rounded-full text-[11px] border border-indigo-500/20">
+                      {n}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* CP6: Quality Tags */}
             {rating && rating.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                    {rating.tags.map((tag, i) => (
-                        <span key={i} className="flex items-center gap-1 text-[10px] bg-blue-900/30 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/20">
-                            <Star size={8} className={rating.score > 70 ? "text-yellow-400 fill-yellow-400" : "text-gray-400"} />
-                            {tag}
-                        </span>
-                    ))}
-                </div>
-            )}
-
-            <div className="text-xs text-gray-400 space-y-1 mb-3 bg-gray-900/30 p-2 rounded-lg">
-               <div className="flex justify-between items-center border-b border-gray-700/50 pb-1">
-                 <span>Омега 3:6</span>
-                 {formatOmega(message.data)}
-               </div>
-               <div className="flex justify-between items-center pt-1">
-                 <span>Профиль железа</span>
-                 {formatIron(message.data)}
-               </div>
-            </div>
-            
-            {message.data.importantNutrients.length > 0 && (
-                 <div className="mb-3">
-                   <div className="flex flex-wrap gap-1">
-                     {message.data.importantNutrients.map((n, i) => (
-                       <span key={i} className="bg-indigo-900/50 text-indigo-300 px-1.5 py-0.5 rounded text-[10px]">
-                         {n}
-                       </span>
-                     ))}
-                   </div>
-                 </div>
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                {rating.tags.map((tag, i) => (
+                  <span key={i} className="flex items-center gap-1 text-[10px] bg-blue-900/30 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/20">
+                    <Star size={10} className={rating.score > 70 ? "text-yellow-400 fill-yellow-400" : "text-gray-400"} />
+                    {tag}
+                  </span>
+                ))}
+              </div>
             )}
 
             {onAddLog && (
               <button
                 onClick={() => onAddLog(message.data!, message.text)}
                 disabled={isAdded}
-                className={`w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 ${
+                className={`w-full mt-4 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 ${
                   isAdded
                     ? 'bg-green-600/20 text-green-400 cursor-default border border-green-500/20'
                     : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/20'
