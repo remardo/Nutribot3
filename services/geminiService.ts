@@ -2,8 +2,9 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { ChatMessage, DailyStats } from "../types";
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Read API key from Vite env (browser-safe prefix)
+const GEMINI_API_KEY = (import.meta as any).env?.VITE_GEMINI_API_KEY;
+const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
 const SYSTEM_INSTRUCTION = `
 Ты — NutriBot, ИИ-эксперт по нутрициологии. Твоя цель — анализировать еду по фото или текстовому описанию.
@@ -51,6 +52,12 @@ export const sendMessageToGemini = async (
   images?: string[],
   currentStats?: DailyStats
 ): Promise<{ text: string; data: any | null }> => {
+  if (!ai) {
+    return {
+      text: "Gemini API ключ не задан (VITE_GEMINI_API_KEY).",
+      data: null
+    };
+  }
   try {
     const model = ai.models;
     

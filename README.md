@@ -19,7 +19,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1Q1fkyhhqBdoyPQElqSKzc9
    VITE_CONVEX_URL=<ваш_convex_deployment_url>
    OPENAI_API_KEY=<ключ_OpenAI_для_анализа_блюд>
    OPENAI_MODEL=gpt-4.1   # опционально, можно оставить по умолчанию
-   GEMINI_API_KEY=<ключ_Gemini_для_фолбэка> # опционально
+   VITE_GEMINI_API_KEY=<ключ_Gemini_для_фолбэка> # опционально
    ```
 3. Run dev:  
    `npm run dev`
@@ -30,7 +30,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1Q1fkyhhqBdoyPQElqSKzc9
    - `VITE_CONVEX_URL` — URL деплоймента Convex (из `npx convex dashboard` → Deploy).
    - `OPENAI_API_KEY` — ключ OpenAI.
    - `OPENAI_MODEL` — (опционально) нужная модель, например `gpt-4.1`.
-   - `GEMINI_API_KEY` — (опционально) если хотите фолбэк на Gemini.
+   - `VITE_GEMINI_API_KEY` - (опционально) если хотите фолбэк на Gemini.
 2. Build & Output:
    - Build Command: `npm run build`
    - Output Directory: `dist`
