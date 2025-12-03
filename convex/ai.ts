@@ -97,7 +97,7 @@ export const analyzeMeal = action({
 
     const response = await client.chat.completions.create({
       model: MODEL,
-      temperature: 0.7,
+      // Некоторые модели (например gpt-4.1/gpt-5) не поддерживают custom temperature — оставляем дефолт.
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userContent },
