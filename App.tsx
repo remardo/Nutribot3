@@ -12,6 +12,32 @@ import * as db from './services/dbService';
 import { processNewLog, calculatePlateRating } from './services/gamificationService';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 
+const parseNutrientsFromText = (text: string): NutrientData | null => {
+  const match = text.match(/```json\s*([\s\S]*?)\s*```/i) || text.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    const raw = JSON.parse(match[1] || match[0]);
+    const toNumber = (v: any, d = 0) => (typeof v === 'number' ? v : Number(v) || d);
+    return {
+      name: raw.name || 'Блюдо',
+      calories: toNumber(raw.calories),
+      protein: toNumber(raw.protein),
+      fat: toNumber(raw.fat),
+      carbs: toNumber(raw.carbs),
+      fiber: toNumber(raw.fiber),
+      omega3: toNumber(raw.omega3),
+      omega6: toNumber(raw.omega6),
+      ironTotal: toNumber(raw.ironTotal),
+      hemeIron: toNumber(raw.hemeIron),
+      omega3to6Ratio: raw.omega3to6Ratio,
+      ironType: raw.ironType,
+      importantNutrients: Array.isArray(raw.importantNutrients) ? raw.importantNutrients.map(String) : [],
+    };
+  } catch (e) {
+    return null;
+  }
+};
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'archive'>('chat');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -185,11 +211,14 @@ const App: React.FC = () => {
       // or effectively updated history if re-renders happen between queue items.
       const response = await analyzeMeal(messages, content, images, stats);
 
+      // Fallback parse if backend returned text без data
+      const extracted = response.data || parseNutrientsFromText(response.text);
+
       const botMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'model',
         text: response.text,
-        data: response.data,
+        data: extracted,
         timestamp: Date.now()
       };
 
