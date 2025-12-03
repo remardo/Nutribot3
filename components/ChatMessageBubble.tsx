@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { ChatMessage, NutrientData, PlateRating } from '../types';
-import { ChefHat, Database, Star, Flame, Dumbbell, Droplet, Wheat, Leaf, Scale, ShieldAlert } from 'lucide-react';
+import { ChefHat, Database, Star, Flame, Dumbbell, Droplet, Wheat, Leaf, Scale, ShieldAlert, Save } from 'lucide-react';
 import { calculatePlateRating } from '../services/gamificationService';
 
 interface Props {
@@ -196,10 +196,10 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
                 }`}
               >
                 {isAdded ? (
-                  <>✓ Добавлено в Дневник</>
+                  <>✓ Сохранено в архив</>
                 ) : (
                   <>
-                    <Database size={14} /> Добавить запись (+XP)
+                    <Save size={14} /> Сохранить блюдо
                   </>
                 )}
               </button>
