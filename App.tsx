@@ -38,6 +38,46 @@ const parseNutrientsFromText = (text: string): NutrientData | null => {
   }
 };
 
+
+// Compress image to stay under Convex 1MB limit
+const compressImage = (file: File, maxDim = 1280, quality = 0.7): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > height && width > maxDim) {
+          height = (height * maxDim) / width;
+          width = maxDim;
+        } else if (height > maxDim) {
+          width = (width * maxDim) / height;
+          height = maxDim;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('Canvas not supported'));
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = (e) => reject(e);
+      img.src = reader.result as string;
+    };
+    reader.onerror = (e) => reject(e);
+    reader.readAsDataURL(file);
+  });
+};
+
+const isBase64TooLarge = (dataUrl: string, limitBytes = 900_000) => {
+  const headerEnd = dataUrl.indexOf(',');
+  const base64 = headerEnd >= 0 ? dataUrl.slice(headerEnd + 1) : dataUrl;
+  const size = Math.ceil((base64.length * 3) / 4);
+  return size > limitBytes;
+};
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'chat' | 'stats' | 'archive'>('chat');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -253,18 +293,20 @@ const App: React.FC = () => {
     const files = e.target.files;
     if (files && files.length > 0) {
       
-      const promises = Array.from(files).map(file => {
-        return new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            resolve(reader.result as string); 
-          };
-          reader.readAsDataURL(file as Blob);
-        });
+      const promises = Array.from(files).map(async (file) => {
+        // compress to avoid exceeding Convex 1MB limit per value
+        const dataUrl = await compressImage(file, 1280, 0.7);
+        return dataUrl;
       });
 
       try {
         const base64Images = await Promise.all(promises);
+
+        const filtered = base64Images.filter(img => !isBase64TooLarge(img));
+        if (filtered.length === 0) {
+          console.warn("All selected images are too large after compression.");
+          return;
+        }
         
         // Clear input early to allow re-selection
         if (fileInputRef.current) {
@@ -272,7 +314,7 @@ const App: React.FC = () => {
         }
 
         // Add to persistent queue and trigger processing
-        await db.addToQueue(base64Images);
+        await db.addToQueue(filtered);
         setQueueTrigger(prev => prev + 1);
         
       } catch (err) {
