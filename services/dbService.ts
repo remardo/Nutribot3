@@ -227,10 +227,17 @@ export const getChatHistory = async (): Promise<ChatMessage[]> => {
 export const saveChatHistory = async (
   messages: ChatMessage[]
 ): Promise<ChatMessage[]> => {
+  // Strip heavy image payloads before persisting history (to avoid quota/issues on mobile)
+  const compact = messages.map((m) => ({
+    ...m,
+    image: undefined,
+    images: undefined,
+  }));
+
   if (useLocalFallback) return localApi.saveChatHistory(messages);
   return await convex.mutation("chat:save", {
     userId: getUserId(),
-    messages,
+    messages: compact,
   });
 };
 
