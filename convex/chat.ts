@@ -24,21 +24,24 @@ export const save = mutation({
         image: v.optional(v.string()),
         images: v.optional(v.array(v.string())),
         data: v.optional(
-          v.object({
-            name: v.string(),
-            calories: v.number(),
-            protein: v.number(),
-            fat: v.number(),
-            carbs: v.number(),
-            fiber: v.number(),
-            omega3: v.number(),
-            omega6: v.number(),
-            ironTotal: v.number(),
-            hemeIron: v.number(),
-            omega3to6Ratio: v.optional(v.string()),
-            ironType: v.optional(v.string()),
-            importantNutrients: v.array(v.string()),
-          })
+          v.union(
+            v.null(),
+            v.object({
+              name: v.string(),
+              calories: v.number(),
+              protein: v.number(),
+              fat: v.number(),
+              carbs: v.number(),
+              fiber: v.number(),
+              omega3: v.number(),
+              omega6: v.number(),
+              ironTotal: v.number(),
+              hemeIron: v.number(),
+              omega3to6Ratio: v.optional(v.string()),
+              ironType: v.optional(v.string()),
+              importantNutrients: v.array(v.string()),
+            })
+          )
         ),
       })
     ),
