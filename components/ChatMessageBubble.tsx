@@ -25,6 +25,11 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
     ? message.images 
     : (message.image ? [message.image] : []);
 
+  const cleanText = useMemo(() => {
+    if (!message.text) return "";
+    return message.text.replace(/```json[\s\S]*?```/gi, "").trim();
+  }, [message.text]);
+
   const formatOmega = (data: NutrientData) => {
     // If we have specific values
     if ((data.omega3 || 0) > 0 || (data.omega6 || 0) > 0) {
@@ -88,7 +93,7 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
               ))}
             </div>
           )}
-          {message.text}
+          {cleanText || message.text}
         </div>
 
         {/* Structured Data Card (Bot Only) */}
