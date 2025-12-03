@@ -101,23 +101,30 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
           <div className="mt-2 w-full bg-gray-800 border border-gray-700 rounded-2xl p-4 shadow-lg relative overflow-hidden">
             {/* Grade */}
             {rating && (
-              <div className="absolute top-3 right-3 bg-gray-900/80 px-3 py-1.5 rounded-xl border border-gray-700 text-xs font-bold flex items-center gap-2 pointer-events-none shadow-lg">
-                <span className="text-gray-400 uppercase tracking-wide">Оценка</span>
-                <span className={`text-lg ${rating.color}`}>{rating.grade}</span>
-                <span className="text-gray-500 font-mono">({rating.score})</span>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <ChefHat size={16} className="text-green-400" />
+                  <h3 className="font-bold text-green-400 text-base leading-tight">{message.data.name}</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="bg-gray-900/70 px-3 py-1.5 rounded-xl border border-gray-700 text-xs flex items-center gap-1 text-orange-200">
+                    <Flame size={14} className="text-orange-400" />
+                    <span className="font-semibold text-gray-100">{message.data.calories} ккал</span>
+                  </div>
+                  <div className="bg-gray-900/80 px-3 py-1.5 rounded-xl border border-gray-700 text-xs font-bold flex items-center gap-2 pointer-events-none shadow-lg">
+                    <span className="text-gray-400 uppercase tracking-wide">Оценка</span>
+                    <span className={`text-lg ${rating.color}`}>{rating.grade}</span>
+                    <span className="text-gray-500 font-mono">({rating.score})</span>
+                  </div>
+                </div>
               </div>
             )}
-
-            <div className="flex items-start justify-between gap-2 mb-3 pr-28 pt-2">
-              <div className="flex items-center gap-2">
+            {!rating && (
+              <div className="flex items-center gap-2 mb-3">
                 <ChefHat size={16} className="text-green-400" />
                 <h3 className="font-bold text-green-400 text-base leading-tight">{message.data.name}</h3>
               </div>
-              <div className="bg-gray-900/70 px-3 py-1.5 rounded-xl border border-gray-700 text-xs flex items-center gap-1 text-orange-200">
-                <Flame size={14} className="text-orange-400" />
-                <span className="font-semibold text-gray-100">{message.data.calories} ккал</span>
-              </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-4 gap-2 text-xs mb-3">
               <div className="bg-gray-900/70 rounded-xl p-2 flex flex-col items-center gap-1 border border-gray-700/60">
@@ -196,7 +203,7 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
                 }`}
               >
                 {isAdded ? (
-                  <>✓ Сохранено в архив</>
+                  <>✓ Сохранено</>
                 ) : (
                   <>
                     <Save size={14} /> Сохранить блюдо
