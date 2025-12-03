@@ -98,7 +98,7 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
 
         {/* Structured Data Card (Bot Only) */}
         {!isUser && message.data && (
-          <div className="mt-2 w-full bg-gray-850 bg-gray-800 border border-gray-700 rounded-2xl p-4 shadow-lg relative overflow-hidden">
+          <div className="mt-2 w-full bg-gray-800 border border-gray-700 rounded-2xl p-4 shadow-lg relative overflow-hidden">
             {/* Grade */}
             {rating && (
               <div className="absolute top-3 right-3 bg-gray-900/80 px-3 py-1.5 rounded-xl border border-gray-700 text-xs font-bold flex items-center gap-2">
@@ -108,34 +108,36 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
               </div>
             )}
 
-            <div className="flex items-center gap-2 mb-1">
-              <ChefHat size={16} className="text-green-400" />
-              <h3 className="font-bold text-green-400 text-base leading-tight">{message.data.name}</h3>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-gray-400 mb-3">
-              <Flame size={14} className="text-orange-400" />
-              <span className="font-semibold text-gray-200">{message.data.calories} ккал</span>
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2">
+                <ChefHat size={16} className="text-green-400" />
+                <h3 className="font-bold text-green-400 text-base leading-tight">{message.data.name}</h3>
+              </div>
+              <div className="bg-gray-900/70 px-3 py-1.5 rounded-xl border border-gray-700 text-xs flex items-center gap-1 text-orange-200">
+                <Flame size={14} className="text-orange-400" />
+                <span className="font-semibold text-gray-100">{message.data.calories} ккал</span>
+              </div>
             </div>
 
             <div className="grid grid-cols-4 gap-2 text-xs mb-3">
-              <div className="bg-gray-900/60 rounded-xl p-2 flex flex-col items-center gap-1 border border-gray-700/60">
+              <div className="bg-gray-900/70 rounded-xl p-2 flex flex-col items-center gap-1 border border-gray-700/60">
                 <Dumbbell size={14} className="text-blue-400" />
-                <span className="font-bold text-blue-300 text-sm">{message.data.protein}г</span>
+                <span className="font-bold text-blue-200 text-sm">{message.data.protein}г</span>
                 <span className="text-gray-500">Белки</span>
               </div>
-              <div className="bg-gray-900/60 rounded-xl p-2 flex flex-col items-center gap-1 border border-gray-700/60">
+              <div className="bg-gray-900/70 rounded-xl p-2 flex flex-col items-center gap-1 border border-gray-700/60">
                 <Droplet size={14} className="text-yellow-400" />
-                <span className="font-bold text-yellow-300 text-sm">{message.data.fat}г</span>
+                <span className="font-bold text-yellow-200 text-sm">{message.data.fat}г</span>
                 <span className="text-gray-500">Жиры</span>
               </div>
-              <div className="bg-gray-900/60 rounded-xl p-2 flex flex-col items-center gap-1 border border-gray-700/60">
+              <div className="bg-gray-900/70 rounded-xl p-2 flex flex-col items-center gap-1 border border-gray-700/60">
                 <Wheat size={14} className="text-orange-400" />
-                <span className="font-bold text-orange-300 text-sm">{message.data.carbs}г</span>
+                <span className="font-bold text-orange-200 text-sm">{message.data.carbs}г</span>
                 <span className="text-gray-500">Угл</span>
               </div>
-              <div className="bg-gray-900/60 rounded-xl p-2 flex flex-col items-center gap-1 border border-gray-700/60">
+              <div className="bg-gray-900/70 rounded-xl p-2 flex flex-col items-center gap-1 border border-gray-700/60">
                 <Leaf size={14} className="text-green-400" />
-                <span className="font-bold text-green-300 text-sm">{message.data.fiber}г</span>
+                <span className="font-bold text-green-200 text-sm">{message.data.fiber}г</span>
                 <span className="text-gray-500">Клетч</span>
               </div>
             </div>
