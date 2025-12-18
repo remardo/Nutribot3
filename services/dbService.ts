@@ -52,10 +52,39 @@ const normalizeLog = (doc: any): DailyLogItem => ({
   aiAnalysis: doc.aiAnalysis,
   plateRating: doc.plateRating,
   note: doc.note,
-  image: doc.image ?? doc.imageId,
+  image: doc.image,
   imageId: doc.imageId,
+  imageIds: doc.imageIds ?? (doc.imageId ? [doc.imageId] : undefined),
   images: doc.images ?? [],
 });
+
+const hydrateImageUrls = async <T extends { imageIds?: string[]; images?: string[]; image?: string }>(
+  items: T[]
+): Promise<T[]> => {
+  if (useLocalFallback) return items;
+
+  const allIds = Array.from(
+    new Set(
+      items.flatMap((i) => (Array.isArray(i.imageIds) ? i.imageIds : []))
+    )
+  );
+  if (allIds.length === 0) return items;
+
+  const urlMap: Record<string, string | null> = await convex.query("files:getUrls", {
+    storageIds: allIds,
+  });
+
+  return items.map((i) => {
+    if (!i.imageIds || i.imageIds.length === 0) return i;
+    const urls = i.imageIds.map((id) => urlMap[id]).filter(Boolean) as string[];
+    if (urls.length === 0) return i;
+    return {
+      ...i,
+      images: urls,
+      image: urls[0],
+    };
+  });
+};
 
 const computeLast7DaysStats = (logs: DailyLogItem[]): DayStats[] => {
   const stats: DayStats[] = [];
@@ -184,7 +213,8 @@ const localApi = {
 export const getAllLogs = async (): Promise<DailyLogItem[]> => {
   if (useLocalFallback) return localApi.getAllLogs();
   const rows = await convex.query("logs:getAll", { userId: getUserId() });
-  return rows.map(normalizeLog);
+  const normalized = rows.map(normalizeLog);
+  return await hydrateImageUrls(normalized);
 };
 
 export const addToDailyLog = async (
@@ -195,7 +225,9 @@ export const addToDailyLog = async (
     userId: getUserId(),
     item,
   });
-  return normalizeLog(created);
+  const normalized = normalizeLog(created);
+  const [hydrated] = await hydrateImageUrls([normalized]);
+  return hydrated ?? normalized;
 };
 
 export const updateLogItem = async (
@@ -208,7 +240,10 @@ export const updateLogItem = async (
     id,
     updates,
   });
-  return updated ? normalizeLog(updated) : null;
+  if (!updated) return null;
+  const normalized = normalizeLog(updated);
+  const [hydrated] = await hydrateImageUrls([normalized]);
+  return hydrated ?? normalized;
 };
 
 export const deleteLogItem = async (id: string): Promise<void> => {
@@ -221,7 +256,8 @@ export const getLast7DaysStats = (logs: DailyLogItem[]): DayStats[] =>
 
 export const getChatHistory = async (): Promise<ChatMessage[]> => {
   if (useLocalFallback) return localApi.getChatHistory();
-  return await convex.query("chat:get", { userId: getUserId() });
+  const messages: ChatMessage[] = await convex.query("chat:get", { userId: getUserId() });
+  return await hydrateImageUrls(messages);
 };
 
 export const saveChatHistory = async (

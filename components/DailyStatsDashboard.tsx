@@ -102,7 +102,7 @@ const DailyStatsDashboard: React.FC<Props> = ({ log, weeklyData = [], allLogs = 
   const dailyProgress = useMemo(() => {
       return {
           mealsCount: log.length,
-          hasPhoto: log.some(l => (l.images && l.images.length > 0) || l.image),
+          hasPhoto: log.some(l => (l.images && l.images.length > 0) || l.image || (l.imageIds && l.imageIds.length > 0) || l.imageId),
           hasQuality: log.some(l => l.plateRating && l.plateRating.score > 70)
       };
   }, [log]);

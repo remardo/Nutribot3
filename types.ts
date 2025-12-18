@@ -34,6 +34,7 @@ export interface DailyLogItem extends NutrientData {
   image?: string; // Legacy
   images?: string[]; // New multi-image support
   imageId?: string; // Optional id from storage/legacy
+  imageIds?: string[]; // Convex Storage ids (multi)
   note?: string;
   aiAnalysis?: string; // Full text description from AI
   plateRating?: PlateRating; // CP6: Quality Score
@@ -59,6 +60,7 @@ export interface ChatMessage {
   text: string;
   image?: string; // Legacy
   images?: string[]; // New multi-image support
+  imageIds?: string[]; // Convex Storage ids (multi)
   data?: NutrientData;
   timestamp: number;
 }

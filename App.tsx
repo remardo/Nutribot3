@@ -11,6 +11,8 @@ import { analyzeMeal } from './services/aiService';
 import * as db from './services/dbService';
 import { processNewLog, calculatePlateRating } from './services/gamificationService';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
+import { convexClient } from './services/convexClient';
+import { compressFileForVision, getStorageUrls, uploadImageToStorage } from './services/imageService';
 
 const parseNutrientsFromText = (text: string): NutrientData | null => {
   const match = text.match(/```json\s*([\s\S]*?)\s*```/i) || text.match(/\{[\s\S]*\}/);
@@ -39,43 +41,63 @@ const parseNutrientsFromText = (text: string): NutrientData | null => {
 };
 
 
-// Compress image to stay under Convex 1MB limit
-const compressImage = (file: File, maxDim = 1280, quality = 0.7): Promise<string> => {
-  return new Promise((resolve, reject) => {
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let { width, height } = img;
-        if (width > height && width > maxDim) {
-          height = (height * maxDim) / width;
-          width = maxDim;
-        } else if (height > maxDim) {
-          width = (width * maxDim) / height;
-          height = maxDim;
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return reject(new Error('Canvas not supported'));
-        ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(dataUrl);
-      };
-      img.onerror = (e) => reject(e);
-      img.src = reader.result as string;
-    };
+    reader.onload = () => resolve(reader.result as string);
     reader.onerror = (e) => reject(e);
     reader.readAsDataURL(file);
   });
+
+const compressDataUrl = (sourceDataUrl: string, maxDim = 1280, quality = 0.7): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+      if (width > height && width > maxDim) {
+        height = (height * maxDim) / width;
+        width = maxDim;
+      } else if (height > maxDim) {
+        width = (width * maxDim) / height;
+        height = maxDim;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('Canvas not supported'));
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve(dataUrl);
+    };
+    img.onerror = () => reject(new Error('Image decode failed (possibly unsupported format like HEIC).'));
+    img.src = sourceDataUrl;
+  });
 };
 
-const isBase64TooLarge = (dataUrl: string, limitBytes = 900_000) => {
-  const headerEnd = dataUrl.indexOf(',');
-  const base64 = headerEnd >= 0 ? dataUrl.slice(headerEnd + 1) : dataUrl;
-  const size = Math.ceil((base64.length * 3) / 4);
-  return size > limitBytes;
+// Convex documents have a ~1MB size limit; storing base64 in a document must stay well below that.
+// Data URLs are ASCII, so `.length` is a good approximation for bytes.
+const MAX_IMAGE_DATAURL_CHARS = 850_000;
+
+const compressImageToFit = async (file: File): Promise<string> => {
+  const source = await readFileAsDataUrl(file);
+
+  // Try a few progressively smaller encodes instead of dropping the image.
+  const dimCandidates = [1280, 1024, 896, 768, 640];
+  const qualityCandidates = [0.75, 0.7, 0.6, 0.5, 0.4];
+
+  let last: string | null = null;
+  for (const maxDim of dimCandidates) {
+    for (const quality of qualityCandidates) {
+      const dataUrl = await compressDataUrl(source, maxDim, quality);
+      last = dataUrl;
+      if (dataUrl.length <= MAX_IMAGE_DATAURL_CHARS) return dataUrl;
+    }
+  }
+
+  // Still too large even after aggressive compression.
+  const len = last?.length ?? 0;
+  throw new Error(`Image is too large after compression (dataUrl chars=${len}).`);
 };
 
 const App: React.FC = () => {
@@ -85,6 +107,7 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [dayKey, setDayKey] = useState(() => new Date().toDateString());
   
   // Notification State
   const [rewardNotification, setRewardNotification] = useState<{show: boolean, rewards: Partial<Wallet>}>({show: false, rewards: {}});
@@ -107,11 +130,21 @@ const App: React.FC = () => {
     });
   });
 
+  // Ensure "today" derived data updates when the calendar day changes (e.g. app kept open overnight).
+  useEffect(() => {
+    const tick = () => {
+      const next = new Date().toDateString();
+      setDayKey((prev) => (prev === next ? prev : next));
+    };
+    tick();
+    const id = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   // Derived state for today's log (for Stats and Context)
   const todayLog = useMemo(() => {
-    const today = new Date().toDateString();
-    return allLogs.filter(item => new Date(item.timestamp).toDateString() === today);
-  }, [allLogs]);
+    return allLogs.filter(item => new Date(item.timestamp).toDateString() === dayKey);
+  }, [allLogs, dayKey]);
 
   // Initial load
   useEffect(() => {
@@ -194,7 +227,7 @@ const App: React.FC = () => {
 
       const nextImage = await db.popFromQueue();
       if (nextImage) {
-        await processMessage("Проанализируй это фото", [nextImage]);
+        await processMessage("Проанализируй это фото", convexClient ? { imageIds: [nextImage] } : { images: [nextImage] });
         // After processing finishes, isLoading becomes false, triggering this effect again if needed
         // but we also toggle trigger to ensure re-run
         setQueueTrigger(prev => prev + 1);
@@ -208,13 +241,27 @@ const App: React.FC = () => {
    * Core function to process a single message request (Text or Text+Image)
    * This handles the API call and state updates.
    */
-  const processMessage = async (content: string, images?: string[]) => {
+  const processMessage = async (
+    content: string,
+    opts?: { images?: string[]; imageIds?: string[] }
+  ) => {
+    let displayImages = opts?.images;
+    if (!displayImages && opts?.imageIds && opts.imageIds.length > 0) {
+      try {
+        const map = await getStorageUrls(opts.imageIds);
+        displayImages = opts.imageIds.map((id) => map[id]).filter(Boolean) as string[];
+      } catch (e) {
+        console.warn("Failed to resolve storage URLs", e);
+      }
+    }
+
     // 1. Add User Message immediately
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
       text: content,
-      images: images,
+      images: displayImages,
+      imageIds: opts?.imageIds,
       timestamp: Date.now()
     };
 
@@ -249,7 +296,10 @@ const App: React.FC = () => {
       // We pass the current 'messages' state from the render closure. 
       // This ensures that when processing a queue, each request uses the history *as it was* when the component rendered,
       // or effectively updated history if re-renders happen between queue items.
-      const response = await analyzeMeal(messages, content, images, stats);
+      const response = await analyzeMeal(messages, content, {
+        images: opts?.images,
+        imageIds: opts?.imageIds,
+      }, stats);
 
       // Fallback parse if backend returned text без data
       const extracted = response.data || parseNutrientsFromText(response.text);
@@ -259,6 +309,8 @@ const App: React.FC = () => {
         role: 'model',
         text: response.text,
         data: extracted,
+        imageIds: opts?.imageIds,
+        images: displayImages,
         timestamp: Date.now()
       };
 
@@ -293,43 +345,165 @@ const App: React.FC = () => {
     const files = e.target.files;
     if (files && files.length > 0) {
       
-      const promises = Array.from(files).map(async (file) => {
-        // compress to avoid exceeding Convex 1MB limit per value
-        const dataUrl = await compressImage(file, 1280, 0.7);
-        return dataUrl;
-      });
-
       try {
-        const base64Images = await Promise.all(promises);
+        if (convexClient) {
+          const results = await Promise.allSettled(
+            Array.from(files).map(async (file) => {
+              try {
+                const blob = await compressFileForVision(file);
+                const storageId = await uploadImageToStorage(blob);
+                return { ok: true as const, file, storageId };
+              } catch (err: any) {
+                return {
+                  ok: false as const,
+                  file,
+                  reason: err?.message || String(err),
+                };
+              }
+            })
+          );
 
-        const filtered = base64Images.filter(img => !isBase64TooLarge(img));
-        if (filtered.length === 0) {
-          console.warn("All selected images are too large after compression.");
-          return;
-        }
-        
-        // Clear input early to allow re-selection
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
+          const accepted = results
+            .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+            .map((r) => r.value)
+            .filter((r: any) => r.ok)
+            .map((r: any) => r.storageId as string);
 
-        // Add to persistent queue and trigger processing
-        await db.addToQueue(filtered);
+          const rejected = results
+            .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+            .map((r) => r.value)
+            .filter((r: any) => !r.ok)
+            .map((r: any) => ({ name: r.file?.name, type: r.file?.type, reason: r.reason }));
+
+          const hardRejected = results
+            .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+            .map((r) => String(r.reason));
+
+          if (accepted.length === 0) {
+            console.warn("No images accepted", { rejected, hardRejected });
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "model",
+                text: "Не удалось загрузить фото. Попробуйте JPG/PNG (не HEIC) и поменьше размер.",
+                timestamp: Date.now(),
+              },
+            ]);
+            return;
+          }
+
+          if (rejected.length > 0 || hardRejected.length > 0) {
+            console.warn("Some images were rejected", { rejected, hardRejected });
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "model",
+                text: `Загрузил ${accepted.length} фото. ${rejected.length + hardRejected.length} не удалось обработать (формат/размер).`,
+                timestamp: Date.now(),
+              },
+            ]);
+          }
+
+          await db.addToQueue(accepted);
+        } else {
+          const results = await Promise.allSettled(
+            Array.from(files).map(async (file) => {
+              try {
+                const dataUrl = await compressImageToFit(file);
+                return { ok: true as const, file, dataUrl };
+              } catch (err: any) {
+                return {
+                  ok: false as const,
+                  file,
+                  reason: err?.message || String(err),
+                };
+              }
+            })
+          );
+
+          const accepted = results
+            .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+            .map((r) => r.value)
+            .filter((r: any) => r.ok)
+            .map((r: any) => r.dataUrl as string);
+
+          const rejected = results
+            .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+            .map((r) => r.value)
+            .filter((r: any) => !r.ok)
+            .map((r: any) => ({ name: r.file?.name, type: r.file?.type, reason: r.reason }));
+
+          const hardRejected = results
+            .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+            .map((r) => String(r.reason));
+
+          if (accepted.length === 0) {
+            console.warn("No images accepted", { rejected, hardRejected });
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "model",
+                text: "Не удалось загрузить фото. Попробуйте JPG/PNG (не HEIC) и поменьше размер.",
+                timestamp: Date.now(),
+              },
+            ]);
+            return;
+          }
+
+          if (rejected.length > 0 || hardRejected.length > 0) {
+            console.warn("Some images were rejected", { rejected, hardRejected });
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "model",
+                text: `Загрузил ${accepted.length} фото. ${rejected.length + hardRejected.length} не удалось обработать (формат/размер).`,
+                timestamp: Date.now(),
+              },
+            ]);
+          }
+
+          await db.addToQueue(accepted);
+        }
         setQueueTrigger(prev => prev + 1);
         
       } catch (err) {
         console.error("Error reading files", err);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "model",
+            text: "Ошибка при чтении фото. Попробуйте другое изображение.",
+            timestamp: Date.now(),
+          },
+        ]);
+      } finally {
+        // Always clear input so selecting the same file again triggers onChange.
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
       }
     }
   };
 
-  const handleAddToLog = async (data: NutrientData, aiText?: string) => {
+  const handleAddToLog = async (
+    data: NutrientData,
+    aiText?: string,
+    imageIds?: string[],
+    images?: string[]
+  ) => {
     const plateRating = calculatePlateRating(data, userGoals);
 
     const newItem = await db.addToDailyLog({
       ...data,
       aiAnalysis: aiText,
-      plateRating: plateRating 
+      plateRating: plateRating,
+      imageIds: convexClient && imageIds && imageIds.length > 0 ? imageIds : undefined,
+      images: !convexClient && images && images.length > 0 ? images : undefined,
     });
     
     const updatedLogs = [newItem, ...allLogs].sort((a,b) => b.timestamp - a.timestamp);

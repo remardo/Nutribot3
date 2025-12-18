@@ -54,11 +54,13 @@ export const analyzeMeal = action({
         timestamp: v.number(),
         image: v.optional(v.string()),
         images: v.optional(v.array(v.string())),
+        imageIds: v.optional(v.array(v.string())),
         data: v.optional(v.any()),
       })
     ),
     newMessage: v.string(),
     images: v.optional(v.array(v.string())),
+    imageIds: v.optional(v.array(v.string())),
     currentStats: v.optional(
       v.object({
         totalCalories: v.number(),
@@ -73,7 +75,7 @@ export const analyzeMeal = action({
       })
     ),
   },
-  handler: async (_ctx, { history, newMessage, images = [], currentStats }) => {
+  handler: async (ctx, { history, newMessage, images = [], imageIds = [], currentStats }) => {
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const statsText = currentStats
@@ -92,12 +94,23 @@ export const analyzeMeal = action({
       },
     ];
 
-    for (const img of images) {
-      const base64 = img.includes(",") ? img.split(",")[1] : img;
-      userContent.push({
-        type: "image_url",
-        image_url: { url: `data:image/jpeg;base64,${base64}` },
-      });
+    if (imageIds.length > 0) {
+      const urls = await Promise.all(imageIds.map((id) => ctx.storage.getUrl(id as any)));
+      for (const url of urls) {
+        if (!url) continue;
+        userContent.push({
+          type: "image_url",
+          image_url: { url },
+        });
+      }
+    } else {
+      for (const img of images) {
+        const base64 = img.includes(",") ? img.split(",")[1] : img;
+        userContent.push({
+          type: "image_url",
+          image_url: { url: `data:image/jpeg;base64,${base64}` },
+        });
+      }
     }
 
     const response = await client.chat.completions.create({

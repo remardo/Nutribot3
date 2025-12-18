@@ -6,7 +6,7 @@ import { calculatePlateRating } from '../services/gamificationService';
 
 interface Props {
   message: ChatMessage;
-  onAddLog?: (data: NutrientData, aiText?: string) => void | Promise<void>;
+  onAddLog?: (data: NutrientData, aiText?: string, imageIds?: string[], images?: string[]) => void | Promise<void>;
   isAdded?: boolean;
 }
 
@@ -81,7 +81,7 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
               : 'bg-gray-800 text-gray-100 rounded-bl-none border border-gray-700'
           }`}
         >
-          {imagesToDisplay.length > 0 && (
+          {isUser && imagesToDisplay.length > 0 && (
             <div className={`mb-2 grid gap-1.5 ${imagesToDisplay.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
               {imagesToDisplay.map((img, idx) => (
                 <img 
@@ -194,7 +194,7 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
 
             {onAddLog && (
               <button
-                onClick={() => onAddLog(message.data!, message.text)}
+                onClick={() => onAddLog(message.data!, message.text, message.imageIds, message.images)}
                 disabled={isAdded}
                 className={`w-full mt-4 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all shadow-md ${
                   isAdded

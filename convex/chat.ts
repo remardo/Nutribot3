@@ -23,6 +23,7 @@ export const save = mutation({
         timestamp: v.number(),
         image: v.optional(v.string()),
         images: v.optional(v.array(v.string())),
+        imageIds: v.optional(v.array(v.string())),
         data: v.optional(
           v.union(
             v.null(),

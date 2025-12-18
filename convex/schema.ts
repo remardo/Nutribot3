@@ -33,6 +33,7 @@ export default defineSchema({
     image: v.optional(v.string()),
     imageId: v.optional(v.string()),
     images: v.optional(v.array(v.string())),
+    imageIds: v.optional(v.array(v.string())),
   })
     .index("by_user_time", ["userId", "timestamp"])
     .index("by_user_name", ["userId", "name"]),
@@ -47,6 +48,7 @@ export default defineSchema({
         timestamp: v.number(),
         image: v.optional(v.string()),
         images: v.optional(v.array(v.string())),
+        imageIds: v.optional(v.array(v.string())),
         data: v.optional(
           v.union(
             v.null(),
@@ -98,4 +100,12 @@ export default defineSchema({
     image: v.string(),
     createdAt: v.number(),
   }).index("by_user_time", ["userId", "createdAt"]),
+
+  photoUploads: defineTable({
+    userId: v.string(),
+    storageId: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_createdAt", ["createdAt"])
+    .index("by_storageId", ["storageId"]),
 });

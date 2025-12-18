@@ -296,7 +296,7 @@ export const getDailyChecklistStatus = (logs: DailyLogItem[]): DailyChecklistTas
     });
     
     // 3. Photo Logged (Assuming if we have logs with image/images)
-    const hasPhoto = logs.some(l => (l.images && l.images.length > 0) || l.image);
+    const hasPhoto = logs.some(l => (l.images && l.images.length > 0) || l.image || (l.imageIds && l.imageIds.length > 0) || l.imageId);
     tasks.push({
         id: 'task_photo',
         label: 'Фото еды',
@@ -399,7 +399,7 @@ export const checkDayCompletion = (dailyLogs: DailyLogItem[]): boolean => {
     if (dailyLogs.length < 2) return false;
     
     // 2. Has Photo
-    const hasPhoto = dailyLogs.some(l => (l.images && l.images.length > 0) || l.image);
+    const hasPhoto = dailyLogs.some(l => (l.images && l.images.length > 0) || l.image || (l.imageIds && l.imageIds.length > 0) || l.imageId);
     if (!hasPhoto) return false;
     
     // 3. Quality Meal (Score > 70)
@@ -505,7 +505,7 @@ export const processNewLog = async (
             q.progress = 1;
             progressed = true;
         }
-        if (q.id === 'q_photo' && ((newLog.images && newLog.images.length > 0) || newLog.image)) {
+        if (q.id === 'q_photo' && ((newLog.images && newLog.images.length > 0) || newLog.image || (newLog.imageIds && newLog.imageIds.length > 0) || newLog.imageId)) {
             q.progress = 1;
             progressed = true;
         }

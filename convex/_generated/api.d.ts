@@ -10,6 +10,9 @@
 
 import type * as ai from "../ai.js";
 import type * as chat from "../chat.js";
+import type * as cleanup from "../cleanup.js";
+import type * as crons from "../crons.js";
+import type * as files from "../files.js";
 import type * as game from "../game.js";
 import type * as goals from "../goals.js";
 import type * as logs from "../logs.js";
@@ -24,6 +27,9 @@ import type {
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
   chat: typeof chat;
+  cleanup: typeof cleanup;
+  crons: typeof crons;
+  files: typeof files;
   game: typeof game;
   goals: typeof goals;
   logs: typeof logs;

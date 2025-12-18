@@ -292,6 +292,12 @@ const FoodArchive: React.FC<Props> = ({ logs, onDelete, onUpdate }) => {
             <div className="space-y-3">
               {dayItems.map((item) => {
                 const isExpanded = expandedId === item.id;
+                const imagesToDisplay =
+                  item.images && item.images.length > 0
+                    ? item.images
+                    : item.image
+                    ? [item.image]
+                    : [];
                 
                 return (
                 <div key={item.id} className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 shadow-sm relative group hover:border-gray-600 transition-colors">
@@ -316,6 +322,20 @@ const FoodArchive: React.FC<Props> = ({ logs, onDelete, onUpdate }) => {
                              </div>
                         </div>
                       </div>
+
+                      {imagesToDisplay.length > 0 && (
+                        <div className={`mt-2 grid gap-1.5 ${imagesToDisplay.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                          {imagesToDisplay.slice(0, 4).map((img, idx) => (
+                            <img
+                              key={idx}
+                              src={img}
+                              alt={`Meal ${idx + 1}`}
+                              className={`rounded-lg object-cover w-full border border-gray-700/60 ${imagesToDisplay.length > 1 ? 'aspect-square' : 'max-h-56'}`}
+                              loading="lazy"
+                            />
+                          ))}
+                        </div>
+                      )}
 
                       {/* Mini Macros Row (Always visible) */}
                       <div className="grid grid-cols-5 gap-1 mt-3">

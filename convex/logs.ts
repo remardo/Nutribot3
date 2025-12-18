@@ -44,6 +44,7 @@ export const add = mutation({
       image: v.optional(v.string()),
       imageId: v.optional(v.string()),
       images: v.optional(v.array(v.string())),
+      imageIds: v.optional(v.array(v.string())),
     }),
   },
   handler: async ({ db }, { userId, item }) => {
@@ -98,6 +99,7 @@ export const update = mutation({
       image: v.optional(v.string()),
       imageId: v.optional(v.string()),
       images: v.optional(v.array(v.string())),
+      imageIds: v.optional(v.array(v.string())),
     }),
   },
   handler: async ({ db }, { userId, id, updates }) => {
