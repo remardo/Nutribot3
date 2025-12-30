@@ -115,6 +115,7 @@ export default defineSchema({
     payload: v.any(),
     createdAt: v.number(),
   })
+    .index("by_createdAt", ["createdAt"])
     .index("by_user_time", ["userId", "createdAt"])
     .index("by_type_time", ["type", "createdAt"]),
 });
