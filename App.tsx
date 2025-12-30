@@ -14,27 +14,34 @@ import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { convexClient } from './services/convexClient';
 import { compressFileForVision, getStorageUrls, uploadImageToStorage } from './services/imageService';
 
+const normalizeNutrients = (raw: any): NutrientData | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const toNumber = (v: any, d = 0) => (typeof v === 'number' ? v : Number(v) || d);
+  return {
+    name: raw.name || 'Блюдо',
+    calories: toNumber(raw.calories),
+    protein: toNumber(raw.protein),
+    fat: toNumber(raw.fat),
+    carbs: toNumber(raw.carbs),
+    fiber: toNumber(raw.fiber),
+    omega3: toNumber(raw.omega3),
+    omega6: toNumber(raw.omega6),
+    ironTotal: toNumber(raw.ironTotal),
+    hemeIron: toNumber(raw.hemeIron),
+    omega3to6Ratio: raw.omega3to6Ratio,
+    ironType: raw.ironType,
+    importantNutrients: Array.isArray(raw.importantNutrients)
+      ? raw.importantNutrients.map(String)
+      : [],
+  };
+};
+
 const parseNutrientsFromText = (text: string): NutrientData | null => {
   const match = text.match(/```json\s*([\s\S]*?)\s*```/i) || text.match(/\{[\s\S]*\}/);
   if (!match) return null;
   try {
     const raw = JSON.parse(match[1] || match[0]);
-    const toNumber = (v: any, d = 0) => (typeof v === 'number' ? v : Number(v) || d);
-    return {
-      name: raw.name || 'Блюдо',
-      calories: toNumber(raw.calories),
-      protein: toNumber(raw.protein),
-      fat: toNumber(raw.fat),
-      carbs: toNumber(raw.carbs),
-      fiber: toNumber(raw.fiber),
-      omega3: toNumber(raw.omega3),
-      omega6: toNumber(raw.omega6),
-      ironTotal: toNumber(raw.ironTotal),
-      hemeIron: toNumber(raw.hemeIron),
-      omega3to6Ratio: raw.omega3to6Ratio,
-      ironType: raw.ironType,
-      importantNutrients: Array.isArray(raw.importantNutrients) ? raw.importantNutrients.map(String) : [],
-    };
+    return normalizeNutrients(raw);
   } catch (e) {
     return null;
   }
@@ -121,6 +128,8 @@ const App: React.FC = () => {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesRef = useRef<ChatMessage[]>([]);
+  const queueFailuresRef = useRef<Record<string, number>>({});
 
   // Hook for Speech Recognition
   const { isListening, toggleListening } = useSpeechRecognition((transcript) => {
@@ -131,6 +140,10 @@ const App: React.FC = () => {
   });
 
   // Ensure "today" derived data updates when the calendar day changes (e.g. app kept open overnight).
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   useEffect(() => {
     const tick = () => {
       const next = new Date().toDateString();
@@ -227,7 +240,17 @@ const App: React.FC = () => {
 
       const nextImage = await db.popFromQueue();
       if (nextImage) {
-        await processMessage("Проанализируй это фото", convexClient ? { imageIds: [nextImage] } : { images: [nextImage] });
+        const ok = await processMessage(
+          "Проанализируй это фото",
+          convexClient ? { imageIds: [nextImage] } : { images: [nextImage] }
+        );
+        if (!ok) {
+          const attempts = (queueFailuresRef.current[nextImage] || 0) + 1;
+          queueFailuresRef.current[nextImage] = attempts;
+          if (attempts < 2) {
+            await db.addToQueue([nextImage]);
+          }
+        }
         // After processing finishes, isLoading becomes false, triggering this effect again if needed
         // but we also toggle trigger to ensure re-run
         setQueueTrigger(prev => prev + 1);
@@ -244,7 +267,7 @@ const App: React.FC = () => {
   const processMessage = async (
     content: string,
     opts?: { images?: string[]; imageIds?: string[] }
-  ) => {
+  ): Promise<boolean> => {
     let displayImages = opts?.images;
     if (!displayImages && opts?.imageIds && opts.imageIds.length > 0) {
       try {
@@ -265,6 +288,7 @@ const App: React.FC = () => {
       timestamp: Date.now()
     };
 
+    const historyForRequest = [...messagesRef.current, userMsg];
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
 
@@ -296,13 +320,13 @@ const App: React.FC = () => {
       // We pass the current 'messages' state from the render closure. 
       // This ensures that when processing a queue, each request uses the history *as it was* when the component rendered,
       // or effectively updated history if re-renders happen between queue items.
-      const response = await analyzeMeal(messages, content, {
+      const response = await analyzeMeal(historyForRequest, content, {
         images: opts?.images,
         imageIds: opts?.imageIds,
       }, stats);
 
       // Fallback parse if backend returned text без data
-      const extracted = response.data || parseNutrientsFromText(response.text);
+      const extracted = normalizeNutrients(response.data) || parseNutrientsFromText(response.text);
 
       const botMsg: ChatMessage = {
         id: crypto.randomUUID(),
@@ -315,6 +339,7 @@ const App: React.FC = () => {
       };
 
       setMessages(prev => [...prev, botMsg]);
+      return true;
 
     } catch (error) {
       console.error(error);
@@ -325,6 +350,7 @@ const App: React.FC = () => {
           timestamp: Date.now()
       };
       setMessages(prev => [...prev, errorMsg]);
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -511,7 +537,7 @@ const App: React.FC = () => {
     setWeeklyStats(db.getLast7DaysStats(updatedLogs));
     
     const currentTodayLogs = updatedLogs.filter(item => 
-        new Date(item.timestamp).toDateString() === new Date().toDateString()
+        new Date(item.timestamp).toDateString() === dayKey
     );
     
     const { rewards } = await processNewLog(newItem, currentTodayLogs, userGoals);

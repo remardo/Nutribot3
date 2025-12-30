@@ -30,6 +30,8 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
     return message.text.replace(/```json[\s\S]*?```/gi, "").trim();
   }, [message.text]);
 
+  const importantNutrients = message.data?.importantNutrients ?? [];
+
   const formatOmega = (data: NutrientData) => {
     // If we have specific values
     if ((data.omega3 || 0) > 0 || (data.omega6 || 0) > 0) {
@@ -155,7 +157,7 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
                   <Scale size={14} className="text-blue-300" />
                   <span>Омега 3:6</span>
                 </div>
-                <span className="font-mono text-sm text-gray-100">{formatOmega(message.data)}</span>
+                <div className="font-mono text-sm text-gray-100">{formatOmega(message.data)}</div>
               </div>
 
               <div className="flex items-center justify-between bg-gray-900/50 p-2 rounded-lg border border-gray-700/60">
@@ -167,11 +169,11 @@ const ChatMessageBubble: React.FC<Props> = ({ message, onAddLog, isAdded }) => {
               </div>
             </div>
 
-            {message.data.importantNutrients.length > 0 && (
+            {importantNutrients.length > 0 && (
               <div className="mt-3">
                 <div className="text-[11px] text-gray-400 mb-1">Важные нутриенты:</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {message.data.importantNutrients.map((n, i) => (
+                  {importantNutrients.map((n, i) => (
                     <span key={i} className="bg-indigo-900/40 text-indigo-200 px-2 py-1 rounded-full text-[11px] border border-indigo-500/20">
                       {n}
                     </span>

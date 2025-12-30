@@ -126,7 +126,7 @@ export const analyzeMeal = action({
       response.choices[0]?.message?.content ||
       "Извините, я не смог это обработать.";
 
-    const jsonMatch = text.match(/```json\\n([\\s\\S]*?)\\n```/);
+    const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
     let extractedData: any = null;
 
     if (jsonMatch && jsonMatch[1]) {
@@ -136,6 +136,9 @@ export const analyzeMeal = action({
         extractedData.omega6 = typeof extractedData.omega6 === "number" ? extractedData.omega6 : 0;
         extractedData.ironTotal = typeof extractedData.ironTotal === "number" ? extractedData.ironTotal : 0;
         extractedData.hemeIron = typeof extractedData.hemeIron === "number" ? extractedData.hemeIron : 0;
+        extractedData.importantNutrients = Array.isArray(extractedData.importantNutrients)
+          ? extractedData.importantNutrients.map(String)
+          : [];
         extractedData.omega3to6Ratio =
           extractedData.omega6 > 0
             ? `1:${(extractedData.omega6 / (extractedData.omega3 || 1)).toFixed(1)}`
@@ -154,7 +157,7 @@ export const analyzeMeal = action({
       }
     }
 
-    const cleanText = text.replace(/```json[\\s\\S]*?```/, "").trim();
+    const cleanText = text.replace(/```json[\s\S]*?```/g, "").trim();
 
     return { text: cleanText, data: extractedData };
   },

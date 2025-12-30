@@ -132,7 +132,13 @@ const computeLast7DaysStats = (logs: DailyLogItem[]): DayStats[] => {
 
 const getLocalStorageLog = (): DailyLogItem[] => {
   const data = localStorage.getItem(STORAGE_KEY);
-  return data ? JSON.parse(data) : [];
+  if (!data) return [];
+  try {
+    return JSON.parse(data);
+  } catch (err) {
+    console.warn("Failed to parse local log storage", err);
+    return [];
+  }
 };
 
 const localApi = {
@@ -146,7 +152,18 @@ const localApi = {
       timestamp: Date.now(),
     };
     const updatedLog = [...currentLog, newItem];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLog));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLog));
+    } catch (err) {
+      // Fallback: drop heavy image payloads if storage quota is exceeded.
+      const compactLog = updatedLog.map((entry) => ({
+        ...entry,
+        image: undefined,
+        images: undefined,
+      }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(compactLog));
+      return { ...newItem, image: undefined, images: undefined };
+    }
     return newItem;
   },
   updateLogItem: (id: string, updates: Partial<DailyLogItem>): DailyLogItem | null => {
@@ -154,7 +171,16 @@ const localApi = {
     const updatedLog = currentLog.map((item) =>
       item.id === id ? { ...item, ...updates } : item
     );
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLog));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLog));
+    } catch (err) {
+      const compactLog = updatedLog.map((entry) => ({
+        ...entry,
+        image: undefined,
+        images: undefined,
+      }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(compactLog));
+    }
     return updatedLog.find((l) => l.id === id) || null;
   },
   deleteLogItem: (id: string): void => {
@@ -164,12 +190,24 @@ const localApi = {
   },
   getChatHistory: (): ChatMessage[] => {
     const data = localStorage.getItem(CHAT_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    if (!data) return [];
+    try {
+      return JSON.parse(data);
+    } catch (err) {
+      console.warn("Failed to parse local chat storage", err);
+      return [];
+    }
   },
   saveChatHistory: (messages: ChatMessage[]) => {
     const MAX_HISTORY = 50;
     const messagesToSave = messages.slice(-MAX_HISTORY);
-    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messagesToSave));
+    try {
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messagesToSave));
+    } catch (err) {
+      const compact = messagesToSave.map((m) => ({ ...m, image: undefined, images: undefined }));
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(compact));
+      return compact;
+    }
     return messagesToSave;
   },
   clearChatHistory: () => localStorage.removeItem(CHAT_STORAGE_KEY),
@@ -196,7 +234,13 @@ const localApi = {
   },
   addToQueue: (images: string[]) => {
     const current = localApi.getQueue();
-    localStorage.setItem(QUEUE_KEY, JSON.stringify([...current, ...images]));
+    try {
+      localStorage.setItem(QUEUE_KEY, JSON.stringify([...current, ...images]));
+    } catch (err) {
+      // If queue cannot be persisted, drop oldest items to keep latest entries.
+      const trimmed = [...current, ...images].slice(-5);
+      localStorage.setItem(QUEUE_KEY, JSON.stringify(trimmed));
+    }
   },
   popFromQueue: (): string | null => {
     const current = localApi.getQueue();
@@ -270,7 +314,7 @@ export const saveChatHistory = async (
     images: undefined,
   }));
 
-  if (useLocalFallback) return localApi.saveChatHistory(messages);
+  if (useLocalFallback) return localApi.saveChatHistory(compact);
   return await convex.mutation("chat:save", {
     userId: getUserId(),
     messages: compact,

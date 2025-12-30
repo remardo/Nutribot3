@@ -103,7 +103,7 @@ export const sendMessageToGemini = async (
     const text = response.text || "Извините, я не смог это обработать.";
     
     // Extract JSON if present
-    const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
+    const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
     let extractedData = null;
 
     if (jsonMatch && jsonMatch[1]) {
@@ -115,6 +115,9 @@ export const sendMessageToGemini = async (
         extractedData.omega6 = typeof extractedData.omega6 === 'number' ? extractedData.omega6 : 0;
         extractedData.ironTotal = typeof extractedData.ironTotal === 'number' ? extractedData.ironTotal : 0;
         extractedData.hemeIron = typeof extractedData.hemeIron === 'number' ? extractedData.hemeIron : 0;
+        extractedData.importantNutrients = Array.isArray(extractedData.importantNutrients)
+          ? extractedData.importantNutrients.map(String)
+          : [];
 
         // Legacy compatibility helpers
         extractedData.omega3to6Ratio = extractedData.omega6 > 0 
@@ -132,7 +135,7 @@ export const sendMessageToGemini = async (
     }
 
     // Clean text by removing the JSON block to display to user
-    const cleanText = text.replace(/```json[\s\S]*?```/, '').trim();
+    const cleanText = text.replace(/```json[\s\S]*?```/g, '').trim();
 
     return {
       text: cleanText,
