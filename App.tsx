@@ -13,6 +13,7 @@ import { processNewLog, calculatePlateRating } from './services/gamificationServ
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { convexClient } from './services/convexClient';
 import { compressFileForVision, getStorageUrls, uploadImageToStorage } from './services/imageService';
+import { logTelemetryEvent } from './services/telemetryService';
 
 const normalizeNutrients = (raw: any): NutrientData | null => {
   if (!raw || typeof raw !== 'object') return null;
@@ -82,6 +83,12 @@ const compressDataUrl = (sourceDataUrl: string, maxDim = 1280, quality = 0.7): P
   });
 };
 
+const isHeicFile = (file: File) => {
+  const type = (file.type || "").toLowerCase();
+  const name = (file.name || "").toLowerCase();
+  return type === "image/heic" || type === "image/heif" || name.endsWith(".heic") || name.endsWith(".heif");
+};
+
 // Convex documents have a ~1MB size limit; storing base64 in a document must stay well below that.
 // Data URLs are ASCII, so `.length` is a good approximation for bytes.
 const MAX_IMAGE_DATAURL_CHARS = 850_000;
@@ -130,6 +137,8 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<ChatMessage[]>([]);
   const queueFailuresRef = useRef<Record<string, number>>({});
+  const imagePreviewRef = useRef<Record<string, string>>({});
+  const MAX_QUEUE_RETRIES = 3;
 
   // Hook for Speech Recognition
   const { isListening, toggleListening } = useSpeechRecognition((transcript) => {
@@ -247,9 +256,25 @@ const App: React.FC = () => {
         if (!ok) {
           const attempts = (queueFailuresRef.current[nextImage] || 0) + 1;
           queueFailuresRef.current[nextImage] = attempts;
-          if (attempts < 2) {
-            await db.addToQueue([nextImage]);
+            if (attempts < MAX_QUEUE_RETRIES) {
+              await db.addToQueue([nextImage]);
+            } else {
+              void logTelemetryEvent("queue_item_failed", {
+                imageId: nextImage,
+                attempts,
+              });
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: crypto.randomUUID(),
+                role: "model",
+                text: "Не удалось обработать одно из фото после нескольких попыток. Попробуйте загрузить его снова.",
+                timestamp: Date.now(),
+              },
+            ]);
           }
+        } else {
+          delete queueFailuresRef.current[nextImage];
         }
         // After processing finishes, isLoading becomes false, triggering this effect again if needed
         // but we also toggle trigger to ensure re-run
@@ -272,9 +297,17 @@ const App: React.FC = () => {
     if (!displayImages && opts?.imageIds && opts.imageIds.length > 0) {
       try {
         const map = await getStorageUrls(opts.imageIds);
-        displayImages = opts.imageIds.map((id) => map[id]).filter(Boolean) as string[];
+        const fromStorage = opts.imageIds.map((id) => map[id]).filter(Boolean) as string[];
+        const fromPreview = opts.imageIds
+          .map((id) => imagePreviewRef.current[id])
+          .filter(Boolean) as string[];
+        displayImages = fromStorage.length > 0 ? fromStorage : fromPreview;
       } catch (e) {
         console.warn("Failed to resolve storage URLs", e);
+        const fromPreview = opts.imageIds
+          .map((id) => imagePreviewRef.current[id])
+          .filter(Boolean) as string[];
+        displayImages = fromPreview.length > 0 ? fromPreview : displayImages;
       }
     }
 
@@ -291,6 +324,10 @@ const App: React.FC = () => {
     const historyForRequest = [...messagesRef.current, userMsg];
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
+    void logTelemetryEvent("analysis_request", {
+      hasImages: Boolean(opts?.images?.length || opts?.imageIds?.length),
+      viaConvex: Boolean(convexClient),
+    });
 
     try {
       // Calculate current stats to give context to Gemini
@@ -327,6 +364,11 @@ const App: React.FC = () => {
 
       // Fallback parse if backend returned text без data
       const extracted = normalizeNutrients(response.data) || parseNutrientsFromText(response.text);
+      void logTelemetryEvent("analysis_success", {
+        hasData: Boolean(extracted),
+        hasImages: Boolean(opts?.images?.length || opts?.imageIds?.length),
+        viaConvex: Boolean(convexClient),
+      });
 
       const botMsg: ChatMessage = {
         id: crypto.randomUUID(),
@@ -343,6 +385,11 @@ const App: React.FC = () => {
 
     } catch (error) {
       console.error(error);
+      void logTelemetryEvent("analysis_error", {
+        message: error instanceof Error ? error.message : String(error),
+        hasImages: Boolean(opts?.images?.length || opts?.imageIds?.length),
+        viaConvex: Boolean(convexClient),
+      });
       const errorMsg: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'model',
@@ -373,11 +420,28 @@ const App: React.FC = () => {
       
       try {
         if (convexClient) {
+          const picked = Array.from(files);
+          const filtered = picked.filter((file) => !isHeicFile(file));
+          const skipped = picked.filter((file) => isHeicFile(file));
+          if (skipped.length > 0) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "model",
+                text: `HEIC/HEIF пока не поддерживается. Пропущено: ${skipped.length} фото.`,
+                timestamp: Date.now(),
+              },
+            ]);
+          }
+          if (filtered.length === 0) return;
           const results = await Promise.allSettled(
-            Array.from(files).map(async (file) => {
+            filtered.map(async (file) => {
               try {
                 const blob = await compressFileForVision(file);
                 const storageId = await uploadImageToStorage(blob);
+                const previewDataUrl = await compressDataUrl(await readFileAsDataUrl(file), 640, 0.6);
+                imagePreviewRef.current[storageId] = previewDataUrl;
                 return { ok: true as const, file, storageId };
               } catch (err: any) {
                 return {
@@ -389,21 +453,21 @@ const App: React.FC = () => {
             })
           );
 
-          const accepted = results
-            .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
-            .map((r) => r.value)
-            .filter((r: any) => r.ok)
-            .map((r: any) => r.storageId as string);
+          const accepted: string[] = [];
+          const rejected: { name?: string; type?: string; reason?: string }[] = [];
+          const hardRejected: string[] = [];
 
-          const rejected = results
-            .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
-            .map((r) => r.value)
-            .filter((r: any) => !r.ok)
-            .map((r: any) => ({ name: r.file?.name, type: r.file?.type, reason: r.reason }));
-
-          const hardRejected = results
-            .filter((r): r is PromiseRejectedResult => r.status === "rejected")
-            .map((r) => String(r.reason));
+          results.forEach((r) => {
+            if (r.status === "fulfilled") {
+              if (r.value?.ok) {
+                accepted.push(r.value.storageId as string);
+              } else {
+                rejected.push({ name: r.value?.file?.name, type: r.value?.file?.type, reason: r.value?.reason });
+              }
+            } else {
+              hardRejected.push(String(r.reason));
+            }
+          });
 
           if (accepted.length === 0) {
             console.warn("No images accepted", { rejected, hardRejected });
@@ -416,6 +480,12 @@ const App: React.FC = () => {
                 timestamp: Date.now(),
               },
             ]);
+            void logTelemetryEvent("upload_summary", {
+              accepted: 0,
+              rejected: rejected.length,
+              hardRejected: hardRejected.length,
+              skipped: skipped.length,
+            });
             return;
           }
 
@@ -432,10 +502,31 @@ const App: React.FC = () => {
             ]);
           }
 
+          void logTelemetryEvent("upload_summary", {
+            accepted: accepted.length,
+            rejected: rejected.length,
+            hardRejected: hardRejected.length,
+            skipped: skipped.length,
+          });
           await db.addToQueue(accepted);
         } else {
+          const picked = Array.from(files);
+          const filtered = picked.filter((file) => !isHeicFile(file));
+          const skipped = picked.filter((file) => isHeicFile(file));
+          if (skipped.length > 0) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "model",
+                text: `HEIC/HEIF пока не поддерживается. Пропущено: ${skipped.length} фото.`,
+                timestamp: Date.now(),
+              },
+            ]);
+          }
+          if (filtered.length === 0) return;
           const results = await Promise.allSettled(
-            Array.from(files).map(async (file) => {
+            filtered.map(async (file) => {
               try {
                 const dataUrl = await compressImageToFit(file);
                 return { ok: true as const, file, dataUrl };
@@ -449,21 +540,21 @@ const App: React.FC = () => {
             })
           );
 
-          const accepted = results
-            .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
-            .map((r) => r.value)
-            .filter((r: any) => r.ok)
-            .map((r: any) => r.dataUrl as string);
+          const accepted: string[] = [];
+          const rejected: { name?: string; type?: string; reason?: string }[] = [];
+          const hardRejected: string[] = [];
 
-          const rejected = results
-            .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
-            .map((r) => r.value)
-            .filter((r: any) => !r.ok)
-            .map((r: any) => ({ name: r.file?.name, type: r.file?.type, reason: r.reason }));
-
-          const hardRejected = results
-            .filter((r): r is PromiseRejectedResult => r.status === "rejected")
-            .map((r) => String(r.reason));
+          results.forEach((r) => {
+            if (r.status === "fulfilled") {
+              if (r.value?.ok) {
+                accepted.push(r.value.dataUrl as string);
+              } else {
+                rejected.push({ name: r.value?.file?.name, type: r.value?.file?.type, reason: r.value?.reason });
+              }
+            } else {
+              hardRejected.push(String(r.reason));
+            }
+          });
 
           if (accepted.length === 0) {
             console.warn("No images accepted", { rejected, hardRejected });
@@ -476,6 +567,12 @@ const App: React.FC = () => {
                 timestamp: Date.now(),
               },
             ]);
+            void logTelemetryEvent("upload_summary", {
+              accepted: 0,
+              rejected: rejected.length,
+              hardRejected: hardRejected.length,
+              skipped: skipped.length,
+            });
             return;
           }
 
@@ -492,12 +589,22 @@ const App: React.FC = () => {
             ]);
           }
 
+          void logTelemetryEvent("upload_summary", {
+            accepted: accepted.length,
+            rejected: rejected.length,
+            hardRejected: hardRejected.length,
+            skipped: skipped.length,
+          });
           await db.addToQueue(accepted);
         }
         setQueueTrigger(prev => prev + 1);
         
       } catch (err) {
         console.error("Error reading files", err);
+        void logTelemetryEvent("upload_error", {
+          message: err instanceof Error ? err.message : String(err),
+          viaConvex: Boolean(convexClient),
+        });
         setMessages((prev) => [
           ...prev,
           {

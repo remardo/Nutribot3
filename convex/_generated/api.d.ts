@@ -17,6 +17,7 @@ import type * as game from "../game.js";
 import type * as goals from "../goals.js";
 import type * as logs from "../logs.js";
 import type * as queue from "../queue.js";
+import type * as telemetry from "../telemetry.js";
 
 import type {
   ApiFromModules,
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   goals: typeof goals;
   logs: typeof logs;
   queue: typeof queue;
+  telemetry: typeof telemetry;
 }>;
 
 /**
